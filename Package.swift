@@ -37,9 +37,14 @@ let package = Package(
         // condition below picks, so their files need no `#if os(...)` of
         // their own — except where a target spans several OSes (AppleAudio's
         // output, per OS).
+        // AAudio and the NDK's media codecs: their headers in the Swift
+        // Android SDK's sysroot, through a module map.
+        .systemLibrary(
+            name: "CAndroidAudio"
+        ),
         .target(
             name: "AndroidAudio",
-            dependencies: ["AudioProtocols"]
+            dependencies: ["AudioProtocols", "CAndroidAudio"]
         ),
         .target(
             name: "LinuxAudio",

@@ -1,0 +1,6 @@
+module CAndroidAudio [system] {
+    header "shim.h"
+    link "aaudio"
+    link "mediandk"
+    export *
+}

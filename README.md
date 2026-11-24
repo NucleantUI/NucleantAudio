@@ -57,7 +57,7 @@ and `ClipPlayback` is the processor that plays one.
 | macOS       | AVAudioEngine                                 | AVAudioFile                          |
 | iOS         | AVAudioEngine, `AVAudioSession` `.playback`   | AVAudioFile                          |
 | Linux       | ALSA's default PCM (PipeWire, PulseAudio)     | libsndfile                           |
-| Android     | not yet: throws `unsupportedPlatform`         | not yet: throws `unsupportedPlatform` |
+| Android     | AAudio, shared and low-latency                | the NDK's MediaExtractor and MediaCodec |
 | Windows     | not yet: throws `unsupportedPlatform`         | not yet: throws `unsupportedPlatform` |
 | WebAssembly | Web Audio (AudioWorklet), via JavaScriptKit  | `decodeAudioData`, waited on with JSPI |
 
