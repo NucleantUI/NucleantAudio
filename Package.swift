@@ -60,7 +60,10 @@ let package = Package(
             dependencies: [
                 "AudioProtocols",
                 .product(name: "JavaScriptKit", package: "JavaScriptKit"),
-            ]
+            ],
+            // `@_extern(wasm)`: the page's `await_promise`, which the decoder
+            // waits on `decodeAudioData` with.
+            swiftSettings: [.enableExperimentalFeature("Extern")]
         ),
         .target(
             name: "WindowsAudio",
@@ -79,7 +82,10 @@ let package = Package(
         ),
         .testTarget(
             name: "NucleantAudioTests",
-            dependencies: ["NucleantAudio"]
+            dependencies: ["NucleantAudio"],
+            // Files read back, rather than written by the tests: a browser's
+            // file system is read-only.
+            resources: [.copy("Fixtures")]
         ),
     ],
     swiftLanguageModes: [.v6]

@@ -2,9 +2,19 @@
 //  NucleantAudioTests.swift
 //  NucleantAudioTests
 //
-//  Files written here and read back through each platform's decoder, and a
-//  player run against the real default output — playing silence, so a run
-//  makes no sound. With no output to open (a machine without audio) the
+//  Files read back through each platform's decoder — fixtures, not files
+//  the tests write, as a browser's file system is read-only:
+//
+//    stereo-ramp-22050.wav   16-bit stereo at 22.05 kHz, 1000 frames: left
+//                            frame × 32, right −frame × 32
+//    stereo-ramp-22050.flac  the same, as FLAC
+//    float-mono-48000.wav    32-bit float mono at 48 kHz, 480 frames:
+//                            (frame − 240) / 512, each exact in a Float
+//    silence-44100.wav       16-bit mono at 44.1 kHz, a quarter of a second
+//    not-audio.wav           "this is not a sound"
+//
+//  And a player run against the real default output — playing silence, so a
+//  run makes no sound. With no output to open (a machine without audio) the
 //  player's tests have nothing to check, and pass. And processors on their
 //  own, rendering into a span with no output involved.
 //
@@ -19,43 +29,22 @@ struct NucleantAudioTests {
     // MARK: Loading
 
     @Test func aWAVFileComesBackAsItsSamples() throws {
-        // 16-bit stereo at 22.05 kHz: a ramp up on the left, down on the right.
-        let frames = 1000
-        var samples: [Int16] = []
-        for frame in 0..<frames {
-            samples.append(Int16(frame * 32))
-            samples.append(Int16(-frame * 32))
-        }
-        let url = try write(wav: pcm16(samples), format: 1, channels: 2, sampleRate: 22_050, bits: 16)
-        defer { try? FileManager.default.removeItem(at: url) }
+        try expectStereoRamp(AudioFileLoader().load(contentsOf: fixture("stereo-ramp-22050.wav")))
+    }
 
-        let clip = try AudioFileLoader().load(contentsOf: url)
-        #expect(clip.sampleRate == 22_050)
-        #expect(clip.channels.count == 2)
-        #expect(clip.frameCount == frames)
-        for frame in [0, 1, 500, 999] {
-            #expect(abs(clip.channels[0][frame] - Float(frame * 32) / 32_768) < 1e-4)
-            #expect(abs(clip.channels[1][frame] + Float(frame * 32) / 32_768) < 1e-4)
-        }
+    @Test func aFLACFileComesBackAsItsSamplesAtItsOwnRate() throws {
+        try expectStereoRamp(AudioFileLoader().load(contentsOf: fixture("stereo-ramp-22050.flac")))
     }
 
     @Test func aFloatWAVFileComesBackExactly() throws {
-        let samples: [Float] = (0..<480).map { sin(Float($0) / 480 * 2 * .pi) * 0.5 }
-        var bytes: [UInt8] = []
-        for sample in samples { withUnsafeBytes(of: sample.bitPattern.littleEndian) { bytes += $0 } }
-        let url = try write(wav: bytes, format: 3, channels: 1, sampleRate: 48_000, bits: 32)
-        defer { try? FileManager.default.removeItem(at: url) }
-
-        let clip = try AudioFileLoader().load(contentsOf: url)
+        let clip = try AudioFileLoader().load(contentsOf: fixture("float-mono-48000.wav"))
         #expect(clip.sampleRate == 48_000)
         #expect(clip.channels.count == 1)
-        #expect(clip.channels[0] == samples)
+        #expect(clip.channels[0] == (0..<480).map { Float($0 - 240) / 512 })
     }
 
     @Test func aFileThatIsNotAudioIsNotLoaded() throws {
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("nucleant-not-audio-\(UUID()).wav")
-        try Data("this is not a sound".utf8).write(to: url)
-        defer { try? FileManager.default.removeItem(at: url) }
+        let url = try fixture("not-audio.wav")
         #expect(throws: (any Error).self) { try AudioFileLoader().load(contentsOf: url) }
         #expect(throws: (any Error).self) {
             try AudioFileLoader().load(contentsOf: url.appendingPathExtension("missing"))
@@ -107,9 +96,7 @@ struct NucleantAudioTests {
     @Test func aLoadedClipPlaysToItsEndAtTheOutputsPace() async throws {
         // A quarter of a second at 44.1 kHz, which the output resamples —
         // silent, like the rest of these runs.
-        let url = try write(wav: pcm16([Int16](repeating: 0, count: 11_025)), format: 1, channels: 1, sampleRate: 44_100, bits: 16)
-        defer { try? FileManager.default.removeItem(at: url) }
-        let clip = try AudioFileLoader().load(contentsOf: url)
+        let clip = try AudioFileLoader().load(contentsOf: fixture("silence-44100.wav"))
         #expect(clip.duration == 0.25)
 
         guard let player = openPlayer(ClipPlayback(), channels: 2) else { return }
@@ -217,21 +204,23 @@ struct NucleantAudioTests {
         }
     }
 
-    private func pcm16(_ samples: [Int16]) -> [UInt8] {
-        samples.flatMap { sample in withUnsafeBytes(of: sample.littleEndian) { Array($0) } }
+    /// A file from Fixtures (see the top of this file). Put together from
+    /// the bundle's resource directory rather than looked up: on WASI,
+    /// Foundation's `url(forResource:withExtension:subdirectory:)` returns
+    /// the file's name less its last character.
+    private func fixture(_ name: String) throws -> URL {
+        try #require(Bundle.module.resourceURL).appendingPathComponent("Fixtures").appendingPathComponent(name)
     }
 
-    /// A RIFF WAVE file of `data`, in the temporary directory.
-    private func write(wav data: [UInt8], format: UInt16, channels: UInt16, sampleRate: UInt32, bits: UInt16) throws -> URL {
-        var bytes: [UInt8] = []
-        func append<T: FixedWidthInteger>(_ value: T) { withUnsafeBytes(of: value.littleEndian) { bytes += $0 } }
-        let blockAlign = channels * bits / 8
-        bytes += Array("RIFF".utf8); append(UInt32(36 + data.count)); bytes += Array("WAVE".utf8)
-        bytes += Array("fmt ".utf8); append(UInt32(16)); append(format); append(channels)
-        append(sampleRate); append(sampleRate * UInt32(blockAlign)); append(blockAlign); append(bits)
-        bytes += Array("data".utf8); append(UInt32(data.count)); bytes += data
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("nucleant-audio-\(UUID()).wav")
-        try Data(bytes).write(to: url)
-        return url
+    /// stereo-ramp-22050's samples, at its own rate.
+    private func expectStereoRamp(_ clip: AudioClip) {
+        #expect(clip.sampleRate == 22_050)
+        #expect(clip.channels.count == 2)
+        #expect(clip.frameCount == 1000)
+        guard clip.channels.count == 2, clip.frameCount == 1000 else { return }
+        for frame in [0, 1, 500, 999] {
+            #expect(abs(clip.channels[0][frame] - Float(frame * 32) / 32_768) < 1e-4)
+            #expect(abs(clip.channels[1][frame] + Float(frame * 32) / 32_768) < 1e-4)
+        }
     }
 }
