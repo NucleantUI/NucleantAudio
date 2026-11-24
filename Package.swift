@@ -23,6 +23,10 @@ let package = Package(
             targets: ["AudioProtocols"]
         ),
     ],
+    dependencies: [
+        // WasmAudio's only; resolved everywhere, built for wasm alone.
+        .package(url: "https://github.com/swiftwasm/JavaScriptKit.git", from: "0.63.0"),
+    ],
     targets: [
         // What the platform targets and NucleantAudio share.
         .target(
@@ -50,9 +54,13 @@ let package = Package(
             name: "AppleAudio",
             dependencies: ["AudioProtocols"]
         ),
+        // Web Audio, reached through JavaScriptKit.
         .target(
             name: "WasmAudio",
-            dependencies: ["AudioProtocols"]
+            dependencies: [
+                "AudioProtocols",
+                .product(name: "JavaScriptKit", package: "JavaScriptKit"),
+            ]
         ),
         .target(
             name: "WindowsAudio",

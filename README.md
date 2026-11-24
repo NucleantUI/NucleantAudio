@@ -59,9 +59,15 @@ and `ClipPlayback` is the processor that plays one.
 | Linux       | ALSA's default PCM (PipeWire, PulseAudio)     | libsndfile                           |
 | Android     | not yet: throws `unsupportedPlatform`         | not yet: throws `unsupportedPlatform` |
 | Windows     | not yet: throws `unsupportedPlatform`         | not yet: throws `unsupportedPlatform` |
-| WebAssembly | not yet: throws `unsupportedPlatform`         | not yet: throws `unsupportedPlatform` |
+| WebAssembly | Web Audio (AudioWorklet), via JavaScriptKit  | not yet: throws `unsupportedPlatform` |
 
 On Linux, libasound and libsndfile are opened at run time. Building needs
 neither one's headers, and a machine without them gets
 `outputUnavailable` or `decoderUnavailable` instead of an app that won't
 start.
+
+In a browser the output goes through JavaScriptKit, so the page has to load
+JavaScriptKit's runtime. NucleantApplication's page does that for any module
+built with JavaScriptKit.
+The browser holds back sound until the page has had a user gesture, so an
+output started before one begins at the first click, touch or key press.
