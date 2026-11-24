@@ -5,7 +5,7 @@ Write what makes the sound once, as an `AudioProcessor`. `AudioPlayer`
 runs it on each platform's own output device.
 
 ```swift
-.package(url: "https://github.com/NucleantUI/NucleantAudio.git", branch: "master")
+.package(url: "https://github.com/NucleantUI/NucleantAudio.git", .upToNextMinor(from: "0.0.0"))
 ```
 
 ## Use

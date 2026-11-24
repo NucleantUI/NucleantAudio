@@ -25,7 +25,7 @@ let package = Package(
     ],
     dependencies: [
         // WasmAudio's only; resolved everywhere, built for wasm alone.
-        .package(url: "https://github.com/swiftwasm/JavaScriptKit.git", from: "0.63.0"),
+        .package(url: "https://github.com/swiftwasm/JavaScriptKit.git", .upToNextMinor(from: "0.63.0")),
     ],
     targets: [
         // What the platform targets and NucleantAudio share.
